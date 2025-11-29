@@ -1,0 +1,14 @@
+{
+  "name": "FinGPT-MT-Llama3-8B-GGUF",
+  "image": "your-dockerhub-username/fingpt-llama3-gguf:latest",
+  "entrypoint": ["bash", "start.sh"],
+  "allowed_ports": [8001],
+  "gpu": true,
+  "container_disk_in_gb": 20,
+  "env": {
+    "MODEL_URL": "https://huggingface.co/second-state/FinGPT-MT-Llama-3-8B-LoRA-GGUF/resolve/main/FinGPT-MT-Llama-3-8B-LoRA-Q4_K_M.gguf",
+    "MODEL_FILENAME": "FinGPT-MT-Llama3-Q4_K_M.gguf",
+    "CONTEXT_LENGTH": "4096",
+    "MODEL_NAME": "fingpt-mt-llama3-8b-lora-gguf"
+  }
+}
