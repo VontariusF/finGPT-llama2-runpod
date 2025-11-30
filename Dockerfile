@@ -10,11 +10,15 @@ RUN apt-get update && apt-get install -y \
 
 # Build llama.cpp with CUDA support
 # Note: llama.cpp vendors ggml as a git submodule, so clone recursively.
+# Use CUDA stubs for linking when building without GPU present
 RUN git clone --depth 1 --recurse-submodules https://github.com/ggerganov/llama.cpp.git && \
     cd llama.cpp && \
     mkdir build && \
     cd build && \
-    cmake -DGGML_CUDA=ON .. && \
+    cmake -DGGML_CUDA=ON \
+          -DCMAKE_CUDA_FLAGS="-allow-unsupported-compiler" \
+          .. && \
+    LD_LIBRARY_PATH=/usr/local/cuda/lib64/stubs:$LD_LIBRARY_PATH \
     cmake --build . --config Release -j$(nproc)
 
 WORKDIR /workspace
