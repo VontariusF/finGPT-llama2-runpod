@@ -17,6 +17,7 @@ RUN git clone --depth 1 --recurse-submodules https://github.com/ggerganov/llama.
     cd build && \
     cmake -DGGML_CUDA=ON \
           -DCMAKE_CUDA_FLAGS="-allow-unsupported-compiler" \
+          -DCMAKE_LIBRARY_PATH=/usr/local/cuda/lib64/stubs \
           .. && \
     LD_LIBRARY_PATH=/usr/local/cuda/lib64/stubs:$LD_LIBRARY_PATH \
     cmake --build . --config Release -j$(nproc)
