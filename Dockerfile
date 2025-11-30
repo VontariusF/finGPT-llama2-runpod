@@ -5,7 +5,7 @@ WORKDIR /workspace
 # System dependencies
 RUN apt-get update && apt-get install -y \
     git wget curl python3 python3-pip build-essential cmake ca-certificates \
-    libgomp1 && \
+    libgomp1 libcurl4-openssl-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Build llama.cpp with CUDA support
