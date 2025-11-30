@@ -9,7 +9,8 @@ RUN apt-get update && apt-get install -y \
     rm -rf /var/lib/apt/lists/*
 
 # Build llama.cpp with CUDA support
-RUN git clone https://github.com/ggerganov/llama.cpp.git && \
+# Note: llama.cpp vendors ggml as a git submodule, so clone recursively.
+RUN git clone --depth 1 --recurse-submodules https://github.com/ggerganov/llama.cpp.git && \
     cd llama.cpp && \
     mkdir build && \
     cd build && \
