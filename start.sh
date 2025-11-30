@@ -8,7 +8,20 @@ MODEL_URL="${MODEL_URL:-}"
 CONTEXT_LENGTH="${CONTEXT_LENGTH:-4096}"
 LLAMA_SERVER_PORT="${LLAMA_SERVER_PORT:-8000}"
 API_PORT="${API_PORT:-8001}"
-LLAMA_BIN="${LLAMA_BIN:-/workspace/llama.cpp/build/bin/llama-server}"
+
+# Find llama-server binary (location varies by llama.cpp version)
+if [[ -f "/workspace/llama.cpp/build/bin/llama-server" ]]; then
+  LLAMA_BIN="/workspace/llama.cpp/build/bin/llama-server"
+elif [[ -f "/workspace/llama.cpp/build/bin/server" ]]; then
+  LLAMA_BIN="/workspace/llama.cpp/build/bin/server"
+elif [[ -f "/workspace/llama.cpp/build/llama-server" ]]; then
+  LLAMA_BIN="/workspace/llama.cpp/build/llama-server"
+else
+  echo "ERROR: Could not find llama-server binary" >&2
+  exit 1
+fi
+
+echo "Using llama-server binary: ${LLAMA_BIN}"
 
 mkdir -p "${MODEL_DIR}"
 

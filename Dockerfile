@@ -1,16 +1,22 @@
-FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+FROM nvidia/cuda:12.1.0-devel-ubuntu22.04
 
 WORKDIR /workspace
 
 # System dependencies
 RUN apt-get update && apt-get install -y \
-    git wget curl python3 python3-pip build-essential cmake ca-certificates && \
+    git wget curl python3 python3-pip build-essential cmake ca-certificates \
+    libgomp1 && \
     rm -rf /var/lib/apt/lists/*
 
 # Build llama.cpp with CUDA support
-RUN git clone https://github.com/ggerganov/llama.cpp.git
-WORKDIR /workspace/llama.cpp
-RUN mkdir build && cd build && cmake -DLLAMA_CUDA=ON .. && make -j
+RUN git clone https://github.com/ggerganov/llama.cpp.git && \
+    cd llama.cpp && \
+    mkdir build && \
+    cd build && \
+    cmake -DGGML_CUDA=ON .. && \
+    cmake --build . --config Release -j$(nproc)
+
+WORKDIR /workspace
 
 # Python deps and app code
 WORKDIR /workspace
