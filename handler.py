@@ -62,22 +62,49 @@ def llama_completion(prompt: str, max_tokens: int = 256, temperature: float = 0.
 
 def handle_openai_request(event):
     """
-    Handle OpenAI-compatible requests via RunPod Serverless.
-    Receives openai_route and openai_input when requests are sent to /openai/* path.
+    Handle both OpenAI-compatible and regular requests via RunPod Serverless.
+    - OpenAI routes: received via /openai/* path with openai_route and openai_input
+    - Regular input: received via /run or /runsync with standard input field
     """
     try:
-        # Extract OpenAI route and input
-        openai_input = event.get("openai_input", {})
+        # Check if this is an OpenAI route request
+        openai_input = event.get("openai_input")
         openai_route = event.get("openai_route", "")
 
-        # Handle /v1/models
+        # If not OpenAI route, treat as regular input
+        if openai_input is None:
+            # Regular RunPod input format
+            regular_input = event.get("input", {})
+
+            # Extract prompt from various possible input formats
+            prompt = regular_input.get("prompt") or regular_input.get("text") or str(regular_input.get("test", ""))
+            if not prompt:
+                return {
+                    "status": "error",
+                    "message": "No prompt provided. Use 'prompt' or 'text' field, or use OpenAI-compatible endpoints at /openai/v1/*"
+                }
+
+            max_tokens = regular_input.get("max_tokens", 256)
+            temperature = regular_input.get("temperature", 0.7)
+
+            # Run completion
+            output = llama_completion(prompt, max_tokens=max_tokens, temperature=temperature)
+
+            return {
+                "status": "success",
+                "output": output,
+                "model": MODEL_NAME
+            }
+
+        # Handle OpenAI-compatible routes
+        # /v1/models
         if "/v1/models" in openai_route or openai_route == "/models":
             return {
                 "object": "list",
                 "data": [{"id": MODEL_NAME, "object": "model"}]
             }
 
-        # Handle /v1/chat/completions
+        # /v1/chat/completions
         if "/v1/chat/completions" in openai_route or "/chat/completions" in openai_route:
             messages = openai_input.get("messages", [])
             prompt = "\n".join(m.get("content", "") for m in messages)
@@ -101,7 +128,7 @@ def handle_openai_request(event):
                 "usage": {},
             }
 
-        # Handle /v1/completions
+        # /v1/completions
         if "/v1/completions" in openai_route or "/completions" in openai_route:
             prompt = openai_input.get("prompt", "")
             max_tokens = openai_input.get("max_tokens", 256)
@@ -118,8 +145,11 @@ def handle_openai_request(event):
                 "usage": {},
             }
 
-        # Unknown route
-        return {"error": f"Unknown route: {openai_route}"}
+        # Unknown OpenAI route
+        return {
+            "error": f"Unknown OpenAI route: {openai_route}",
+            "available_routes": ["/v1/models", "/v1/chat/completions", "/v1/completions"]
+        }
 
     except Exception as e:
         return {"error": str(e)}
