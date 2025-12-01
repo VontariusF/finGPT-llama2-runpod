@@ -1,15 +1,16 @@
+"""
+RunPod Serverless handler for FinGPT with llama.cpp backend
+Provides OpenAI-compatible API endpoints
+"""
+
 import os
 import time
 import uuid
 import requests
-from flask import Flask, request, jsonify
-from waitress import serve
+import runpod
 
 LLAMA_SERVER = f"http://127.0.0.1:{os.getenv('LLAMA_SERVER_PORT', '8000')}"
 MODEL_NAME = os.getenv("MODEL_NAME", "fingpt-mt-llama3-8b-lora-gguf")
-API_PORT = int(os.getenv("API_PORT", "8001"))
-
-app = Flask(__name__)
 
 
 def llama_completion(prompt: str, max_tokens: int = 256, temperature: float = 0.7):
@@ -35,59 +36,71 @@ def llama_completion(prompt: str, max_tokens: int = 256, temperature: float = 0.
     raise RuntimeError(f"Unexpected llama.cpp response: {data}")
 
 
-@app.route("/v1/models", methods=["GET"])
-def models():
-    return jsonify({"object": "list", "data": [{"id": MODEL_NAME, "object": "model"}]})
+def handle_openai_request(event):
+    """
+    Handle OpenAI-compatible requests via RunPod Serverless.
+    Receives openai_route and openai_input when requests are sent to /openai/* path.
+    """
+    try:
+        # Extract OpenAI route and input
+        openai_input = event.get("openai_input", {})
+        openai_route = event.get("openai_route", "")
 
+        # Handle /v1/models
+        if "/v1/models" in openai_route or openai_route == "/models":
+            return {
+                "object": "list",
+                "data": [{"id": MODEL_NAME, "object": "model"}]
+            }
 
-@app.route("/v1/chat/completions", methods=["POST"])
-def chat_completions():
-    payload = request.get_json(force=True, silent=True) or {}
-    messages = payload.get("messages", [])
-    prompt = "\n".join(m.get("content", "") for m in messages)
-    max_tokens = payload.get("max_tokens", 256)
-    temperature = payload.get("temperature", 0.7)
+        # Handle /v1/chat/completions
+        if "/v1/chat/completions" in openai_route or "/chat/completions" in openai_route:
+            messages = openai_input.get("messages", [])
+            prompt = "\n".join(m.get("content", "") for m in messages)
+            max_tokens = openai_input.get("max_tokens", 256)
+            temperature = openai_input.get("temperature", 0.7)
 
-    output = llama_completion(prompt, max_tokens=max_tokens, temperature=temperature)
+            output = llama_completion(prompt, max_tokens=max_tokens, temperature=temperature)
 
-    return jsonify(
-        {
-            "id": str(uuid.uuid4()),
-            "object": "chat.completion",
-            "created": int(time.time()),
-            "model": MODEL_NAME,
-            "choices": [
-                {
-                    "index": 0,
-                    "message": {"role": "assistant", "content": output},
-                    "finish_reason": "stop",
-                }
-            ],
-            "usage": {},
-        }
-    )
+            return {
+                "id": str(uuid.uuid4()),
+                "object": "chat.completion",
+                "created": int(time.time()),
+                "model": MODEL_NAME,
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": output},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {},
+            }
 
+        # Handle /v1/completions
+        if "/v1/completions" in openai_route or "/completions" in openai_route:
+            prompt = openai_input.get("prompt", "")
+            max_tokens = openai_input.get("max_tokens", 256)
+            temperature = openai_input.get("temperature", 0.7)
 
-@app.route("/v1/completions", methods=["POST"])
-def completions():
-    payload = request.get_json(force=True, silent=True) or {}
-    prompt = payload.get("prompt", "")
-    max_tokens = payload.get("max_tokens", 256)
-    temperature = payload.get("temperature", 0.7)
+            output = llama_completion(prompt, max_tokens=max_tokens, temperature=temperature)
 
-    output = llama_completion(prompt, max_tokens=max_tokens, temperature=temperature)
+            return {
+                "id": str(uuid.uuid4()),
+                "object": "text_completion",
+                "created": int(time.time()),
+                "model": MODEL_NAME,
+                "choices": [{"index": 0, "text": output, "finish_reason": "stop"}],
+                "usage": {},
+            }
 
-    return jsonify(
-        {
-            "id": str(uuid.uuid4()),
-            "object": "text_completion",
-            "created": int(time.time()),
-            "model": MODEL_NAME,
-            "choices": [{"index": 0, "text": output, "finish_reason": "stop"}],
-            "usage": {},
-        }
-    )
+        # Unknown route
+        return {"error": f"Unknown route: {openai_route}"}
+
+    except Exception as e:
+        return {"error": str(e)}
 
 
 if __name__ == "__main__":
-    serve(app, host="0.0.0.0", port=API_PORT)
+    print("Starting RunPod Serverless handler...")
+    runpod.serverless.start({"handler": handle_openai_request})

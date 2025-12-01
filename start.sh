@@ -45,10 +45,18 @@ echo "Starting llama.cpp server on port ${LLAMA_SERVER_PORT} ..."
   -m "${MODEL_PATH}" \
   -c "${CONTEXT_LENGTH}" \
   --port "${LLAMA_SERVER_PORT}" \
-  --host 0.0.0.0 &
+  --host 127.0.0.1 &
 LLAMA_PID=$!
 
-echo "Starting OpenAI-compatible API wrapper on port ${API_PORT} ..."
-python3 /workspace/handler.py
+# Wait for llama.cpp to be ready
+echo "Waiting for llama.cpp server to be ready..."
+for i in {1..30}; do
+  if curl -s http://127.0.0.1:${LLAMA_SERVER_PORT}/health > /dev/null 2>&1; then
+    echo "llama.cpp server is ready!"
+    break
+  fi
+  sleep 2
+done
 
-wait "${LLAMA_PID}"
+echo "Starting RunPod Serverless handler..."
+python3 /workspace/handler.py

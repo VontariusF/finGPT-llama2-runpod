@@ -29,7 +29,7 @@ WORKDIR /workspace
 WORKDIR /workspace
 COPY handler.py .
 COPY start.sh .
-RUN pip install --no-cache-dir flask waitress requests runpod
+RUN pip install --no-cache-dir requests runpod
 RUN chmod +x /workspace/start.sh
 
 # Expose API port (OpenAI-compatible wrapper)
