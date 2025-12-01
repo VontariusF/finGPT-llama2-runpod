@@ -13,27 +13,51 @@ LLAMA_SERVER = f"http://127.0.0.1:{os.getenv('LLAMA_SERVER_PORT', '8000')}"
 MODEL_NAME = os.getenv("MODEL_NAME", "fingpt-mt-llama3-8b-lora-gguf")
 
 
+def wait_for_llama_server(max_attempts=30, delay=2):
+    """Wait for llama.cpp server to be ready"""
+    print(f"Waiting for llama.cpp server at {LLAMA_SERVER}...")
+    for attempt in range(max_attempts):
+        try:
+            response = requests.get(f"{LLAMA_SERVER}/health", timeout=5)
+            if response.status_code == 200:
+                print(f"llama.cpp server is ready after {attempt + 1} attempts!")
+                return True
+        except Exception as e:
+            print(f"Attempt {attempt + 1}/{max_attempts}: {e}")
+            time.sleep(delay)
+
+    print("ERROR: llama.cpp server failed to start!")
+    return False
+
+
 def llama_completion(prompt: str, max_tokens: int = 256, temperature: float = 0.7):
     """Send a completion request to llama.cpp and return text."""
-    resp = requests.post(
-        f"{LLAMA_SERVER}/completion",
-        json={
-            "prompt": prompt,
-            "n_predict": max_tokens,
-            "temperature": temperature,
-            "stream": False,
-        },
-        timeout=120,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    # llama.cpp returns either `content` or a list under `choices`; handle both.
-    if "content" in data:
-        return data["content"]
-    choices = data.get("choices", [])
-    if choices and "text" in choices[0]:
-        return choices[0]["text"]
-    raise RuntimeError(f"Unexpected llama.cpp response: {data}")
+    try:
+        resp = requests.post(
+            f"{LLAMA_SERVER}/completion",
+            json={
+                "prompt": prompt,
+                "n_predict": max_tokens,
+                "temperature": temperature,
+                "stream": False,
+            },
+            timeout=120,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        # llama.cpp returns either `content` or a list under `choices`; handle both.
+        if "content" in data:
+            return data["content"]
+        choices = data.get("choices", [])
+        if choices and "text" in choices[0]:
+            return choices[0]["text"]
+        raise RuntimeError(f"Unexpected llama.cpp response: {data}")
+    except requests.exceptions.ConnectionError as e:
+        raise RuntimeError(f"Cannot connect to llama.cpp server at {LLAMA_SERVER}: {e}")
+    except requests.exceptions.Timeout as e:
+        raise RuntimeError(f"llama.cpp server timeout: {e}")
+    except Exception as e:
+        raise RuntimeError(f"llama.cpp error: {e}")
 
 
 def handle_openai_request(event):
@@ -103,4 +127,12 @@ def handle_openai_request(event):
 
 if __name__ == "__main__":
     print("Starting RunPod Serverless handler...")
+    print("Handler will wait for llama.cpp to be ready before processing requests")
+
+    # Wait for llama.cpp server to be ready before starting handler
+    if not wait_for_llama_server():
+        print("FATAL: Cannot start handler - llama.cpp server is not available")
+        exit(1)
+
+    print("Starting handler - ready to process requests!")
     runpod.serverless.start({"handler": handle_openai_request})
