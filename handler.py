@@ -6,6 +6,7 @@ Provides OpenAI-compatible API endpoints
 import os
 import time
 import uuid
+import json
 import requests
 import runpod
 
@@ -67,15 +68,22 @@ def handle_openai_request(event):
     - Regular input: received via /run or /runsync with standard input field
     """
     try:
-        # Log the incoming event for debugging
-        print(f"Received event: {event}")
+        # Normalize event fields for OpenAI-style requests
+        # RunPod may wrap values under event["input"].
+        input_section = event.get("input") if isinstance(event.get("input"), dict) else {}
+        openai_input = event.get("openai_input") or input_section.get("openai_input") or input_section.get("body")
+        openai_route = (
+            event.get("openai_route")
+            or input_section.get("openai_route")
+            or event.get("path", "")
+        )
 
-        # Check if this is an OpenAI route request
-        openai_input = event.get("openai_input")
-        openai_route = event.get("openai_route", "")
-
-        print(f"OpenAI route: {openai_route}")
-        print(f"OpenAI input: {openai_input}")
+        # If payload arrived as JSON string, parse it.
+        if isinstance(openai_input, str):
+            try:
+                openai_input = json.loads(openai_input)
+            except Exception:
+                pass
 
         # If not OpenAI route, treat as regular input
         if openai_input is None:
