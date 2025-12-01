@@ -67,9 +67,15 @@ def handle_openai_request(event):
     - Regular input: received via /run or /runsync with standard input field
     """
     try:
+        # Log the incoming event for debugging
+        print(f"Received event: {event}")
+
         # Check if this is an OpenAI route request
         openai_input = event.get("openai_input")
         openai_route = event.get("openai_route", "")
+
+        print(f"OpenAI route: {openai_route}")
+        print(f"OpenAI input: {openai_input}")
 
         # If not OpenAI route, treat as regular input
         if openai_input is None:
