@@ -11,17 +11,17 @@ RUN apt-get update && apt-get install -y \
 # Build llama.cpp with CUDA support
 # Note: llama.cpp vendors ggml as a git submodule, so clone recursively.
 # Using official llama.cpp CUDA Dockerfile configuration
+# Specify common CUDA architectures: 60,61(P100), 70(V100), 75(T4), 80(A100), 86(A10/RTX30), 89(L40/RTX40), 90(H100)
 RUN git clone --depth 1 --recurse-submodules https://github.com/ggerganov/llama.cpp.git && \
     cd llama.cpp && \
-    mkdir build && \
-    cd build && \
-    cmake -DGGML_NATIVE=OFF \
+    cmake -B build \
+          -DGGML_NATIVE=OFF \
           -DGGML_CUDA=ON \
-          -DCMAKE_CUDA_ARCHITECTURES=all-major \
+          -DCMAKE_CUDA_ARCHITECTURES="60;61;70;75;80;86;89;90" \
           -DLLAMA_BUILD_TESTS=OFF \
           -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined \
-          .. && \
-    cmake --build . --config Release -j$(nproc)
+          . && \
+    cmake --build build --config Release -j$(nproc)
 
 WORKDIR /workspace
 
